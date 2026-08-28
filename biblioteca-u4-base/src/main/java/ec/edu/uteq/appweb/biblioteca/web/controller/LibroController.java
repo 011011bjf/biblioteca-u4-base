@@ -1,12 +1,16 @@
 package ec.edu.uteq.appweb.biblioteca.web.controller;
 
+import ec.edu.uteq.appweb.biblioteca.config.CacheConfig;
 import ec.edu.uteq.appweb.biblioteca.domain.Autor;
 import ec.edu.uteq.appweb.biblioteca.domain.Libro;
+import ec.edu.uteq.appweb.biblioteca.exception.ServicioExternoException;
+import ec.edu.uteq.appweb.biblioteca.integration.OpenLibraryResponse;
 import ec.edu.uteq.appweb.biblioteca.service.AutorService;
 import ec.edu.uteq.appweb.biblioteca.service.LibroService;
 import ec.edu.uteq.appweb.biblioteca.web.dto.*;
 import ec.edu.uteq.appweb.biblioteca.web.mapper.AutorMapper;
 import ec.edu.uteq.appweb.biblioteca.web.mapper.LibroMapper;
+import jakarta.persistence.Cacheable;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,6 +18,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.ResourceAccessException;
 
 import java.net.URI;
 import java.util.List;
@@ -65,10 +70,6 @@ public class LibroController {
         return ApiResponse.ok(datos, "Libros listados", PageMeta.de(pagina));
     }
 
-    @GetMapping("/{id}")
-    public ApiResponse<LibroResponse> buscarPorId(@PathVariable Long id) {
-        return ApiResponse.ok(mapper.aRespuesta(servicio.buscarPorId(id)), "Libro encontrado");
-    }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")

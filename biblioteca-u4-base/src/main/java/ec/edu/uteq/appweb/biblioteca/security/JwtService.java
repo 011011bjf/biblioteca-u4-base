@@ -1,7 +1,16 @@
 package ec.edu.uteq.appweb.biblioteca.security;
 
 import ec.edu.uteq.appweb.biblioteca.domain.Usuario;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
+
+import javax.crypto.SecretKey;
+import java.util.Date;
+import java.util.List;
 
 /**
  * ============================================================================
@@ -44,6 +53,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class JwtService {
 
+    private String secretKey = "${jwt.secret}";
+
+    private String jwtExpiration = "${jwt.expiration}";
+
     // TODO-U4-2: inyecte @Value("${app.jwt.secreto}") y @Value("${app.jwt.expiracion-minutos}")
 
     public String generar(Usuario usuario) {
@@ -60,5 +73,27 @@ public class JwtService {
 
     public boolean esValido(String token) {
         throw new UnsupportedOperationException("TODO-U4-2: validar firma y expiracion");
+    }
+    public Claims validarYObtenerClaims(String token) throws JwtException {
+        return Jwts.parser()
+                .verifyWith(getSignInKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    public String generarToken(String username, List<String> roles) {
+        return Jwts.builder()
+                .subject(username)
+                .claim("roles", roles)
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .signWith(getSignInKey(), Jwts.SIG.HS256)
+                .compact();
+    }
+
+    private SecretKey getSignInKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 }

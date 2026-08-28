@@ -66,8 +66,7 @@ springdoc:
 
 app:
   jwt:
-    # TODO-U4-2: NO escriba aqui el secreto real. Generelo asi y expórtelo:
-    #   openssl rand -base64 48
+
     secreto: ${JWT_SECRETO:}
     expiracion-minutos: ${JWT_EXPIRACION_MINUTOS:60}
   api-externa:
@@ -80,3 +79,5 @@ logging:
     root: INFO
     ec.edu.uteq.appweb.biblioteca: DEBUG
     org.hibernate.orm.jdbc.bind: INFO
+
+
