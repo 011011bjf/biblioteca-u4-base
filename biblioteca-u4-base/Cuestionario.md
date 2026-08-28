@@ -68,22 +68,33 @@ servicios que brinda nuestro proyecto. digo que es opcional porque tambien se pu
 **a) Un JWT tiene tres partes separadas por puntos. Nómbrelas en orden e indique qué contiene cada una. (3 puntos)**
 
 **Respuesta:
-1 header contiene el encabezado del token
-2.- Payload contiene el cuerpo del token (todas la clain )
-3.-
+Header: metadatos del token — tipo (`JWT`) y algoritmo de firma usado, codificado en Base64Url.
+Payload: los claims — datos del usuario y metadatos del token.
+Signature: resultado de aplicar el algoritmo indicado en el header sobre header + payload usando una clave secreta o privada; permite verificar integridad y autenticidad.
 **
 
 
 
 **b) Un compañero afirma: «como el JWT va firmado, puedo guardar en el *payload* la contraseña del usuario sin riesgo». Explique por qué está equivocado, precisando la diferencia entre firmar y cifrar. (2 puntos)**
 
-**Respuesta:**
+**Respuesta:
+Firmar ( JWT estándar) garantiza integridad (el contenido no fue alterado) y autenticidad (viene de quien dice venir), pero no oculta el contenido. El header y el payload solo están codificados en Base64Url, que es reversible por cualquiera, no es cifrado.
+Cifrar ( JWE) transforma el contenido para que sea ilegible sin una clave de descifrado, garantizando confidencialidad.
+Por lo tanto, cualquiera que intercepte el token puede decodificar el payload y leer la contraseña en texto claro. Nunca deben colocarse datos sensibles (contraseñas, números de tarjeta, etc.) en el payload de un JWT firmado sin cifrar.
+**
+
 
 
 
 **c) El JWT es *stateless* por diseño, lo que genera un problema conocido: no se puede invalidar un token antes de que expire. Describa dos estrategias distintas para revocarlo y señale la desventaja de cada una. (3 puntos)**
 
-**Respuesta:**
+**Respuesta:
+Lista negra de tokens revocados, almacenada del lado del servidor usando el jti (identificador único del token) hasta su expiración natural.
+Desventaja: reintroduce estado en el servidor, lo cual contradice parcialmente la naturaleza stateless del JWT; requiere una consulta adicional en cada petición, añadiendo latencia.
+Tokens de acceso de vida corta + refresh token verificable en base de datos. El access token expira rápido; para renovarlo se usa un refresh token que sí se valida contra un registro persistente que puede revocarse.
+Desventaja: no permite invalidar de forma inmediata un access token ya emitido ; añade complejidad de manejar y almacenar dos tipos de token.
+
+**
 
 
 
@@ -95,18 +106,29 @@ servicios que brinda nuestro proyecto. digo que es opcional porque tambien se pu
 
 **Respuesta:**
 
-| Criterio | SOAP | REST |
-|---|---|---|
-| Formato del mensaje | | |
-| Contrato de descripción | | |
-| Sobrecarga de serialización | | |
-| Tipado | | |
-| Facilidad de consumo desde un cliente móvil | | |
-| Manejo de errores | | |
+| Criterio | SOAP                                   | REST                                                                         |
+|---|----------------------------------------|------------------------------------------------------------------------------|
+| Formato del mensaje | solo XML                               | es fleximble, mayormente usa json                                            |
+| Contrato de descripción | si utiliza WSDL, formal y obligatorio  | no es obligatorio , se puede utilizar oppenApi como opcional                 |
+| Sobrecarga de serialización | XML verboso + cabeceras del sobre SOAP | todo dentro del Json                                                         |
+| Tipado | Fuerte, validado por contarto XSD      | depende de como se implemente en el servidor y como se consuma en el cliente |
+| Facilidad de consumo desde un cliente móvil |                                        | caualquier plataforma recibe Json                                            |
+| Manejo de errores | lo maneja el mismo xml     | mediante codigos html de estados                              |
 
 **b) El Servicio de Rentas Internas del Ecuador expone la autorización de comprobantes electrónicos mediante servicios SOAP. Explique dos razones técnicas por las que una institución de ese tipo mantiene SOAP en lugar de migrar a REST. (3 puntos)**
 
-**Respuesta:**
+**Respuesta:
+
+1. Contrato formal con tipado estricto (WSDL + XSD): para documentos legales/tributarios como comprobantes electrónicos,
+se necesita una validación estructural inequívoca y verificable automáticamente; el esquema XSD deja cero ambigüedad
+sobre los tipos y la estructura de cada campo, algo que un JSON Schema (opcional en REST) no garantiza con el mismo nivel
+de obligatoriedad.
+
+2. Seguridad a nivel de mensaje SOAP permite firmar y/o cifrar partes específicas del mensaje XML (no solo el canal de transporte
+como hace TLS), lo que da no repudio y trazabilidad legal por documento — un requisito crítico cuando cada comprobante debe
+poder auditarse individualmente años después, independientemente del canal por el que viajó.
+
+**
 
 
 
@@ -118,19 +140,39 @@ servicios que brinda nuestro proyecto. digo que es opcional porque tambien se pu
 
 **a) Describa el patrón *cache-aside* en sus cuatro pasos, desde que llega la petición hasta que se responde. (3 puntos)**
 
-**Respuesta:**
+**Respuesta:
+1. Llega la petición a la aplicación.
+2. La aplicación consulta primero la caché con la petición.
+3. Si hay, se devuelve el dato directamente desde la caché. Si no se consulta la fuente real.
+4. El resultado obtenido de la fuente real se guarda en la caché (con su TTL) y luego se responde al cliente.
+**
 
 
 
 **b) Justifique técnicamente por qué el TTL de `openlibrary` es doce veces mayor que el de `libros`, y qué criterio general debe guiar la elección de un TTL. (3 puntos)**
 
-**Respuesta:**
+**Respuesta:
+Los datos de OpenLibrary(metadatos) son prácticamente estáticos — cambian con muy
+poca frecuencia y consultarlos tiene costo/latencia alto (API externa, con límites de tasa). Por eso conviene un TTL largo (24h):
+reduce drásticamente las llamadas al servicio externo sin riesgo real de mostrar datos desactualizados.
+
+En cambio, `libros` refleja estado interno del propio sistema que cambia constantemente
+por operaciones , así que necesita un TTL corto para no mostrar disponibilidad incorrecta.
+
+**
 
 
 
 **c) Explique por qué nunca debe almacenarse en caché la respuesta de un fallo del servicio externo, y describa qué le ocurriría al sistema si se hiciera. (2 puntos)**
 
-**Respuesta:**
+**Respuesta:
+
+Si se cachea un error (timeout, 500, etc.) del servicio externo, todas las peticiones siguientes durante el TTL recibirán ese mismo
+error, aunque el servicio externo ya se haya recuperado. En la práctica, el propio sistema prolongaría artificialmente una caída que
+ya terminó — se autoinfligiría una interrupción de servicio durante todo el TTL configurado, incluso después de que el problema
+original ya no existiera.
+
+**
 
 
 
@@ -144,16 +186,25 @@ Para cada escenario indique el código HTTP correcto y explique en una línea po
 
 | # | Escenario | Código | Justificación (una línea) |
 |---|---|---|---|
-| a | `GET /api/v1/libros/999999` y ese identificador no existe | | |
-| b | `POST /api/v1/libros` sin cabecera `Authorization` | | |
-| c | Usuario autenticado con rol `LECTOR` envía `POST /api/v1/libros` | | |
-| d | `POST /api/v1/libros` con el campo `titulo` vacío | | |
-| e | Prestar un libro a un socio que ya tiene tres préstamos activos | | |
-| f | La API de Open Library no responde dentro del *timeout* configurado | | |
+| a) `GET /libros/999999` no existe | 404 Not Found | El recurso identificado por esa URI no existe en el servidor. |
+| b) `POST /libros` sin `Authorization` | 401 Unauthorized | No se puede verificar la identidad del cliente porque falta la credencial. |
+| c) Usuario `LECTOR` intenta `POST /libros` | 403 Forbidden | El cliente está autenticado pero no tiene permisos suficientes para esa acción. |
+| d) `POST /libros` con `titulo` vacío | 400 Bad Request| La petición está sintácticamente bien formada pero incumple las reglas de validación del recurso enviado. |
+| e) Socio con 3 préstamos activos pide otro | 409 Conflict | El estado actual del recurso (límite de préstamos alcanzado) impide procesar la solicitud aunque esté bien formada. |
+| f) OpenLibrary no responde a tiempo | 504 Gateway Timeout | El servidor actúa como intermediario hacia un servicio externo (capa) que no respondió dentro del tiempo esperado. |
 
 **g) Explique por qué devolver `200 OK` con un cuerpo `{"success": false}` es un error de diseño, y qué restricción de REST se incumple al hacerlo. (2 puntos)**
 
-**Respuesta:**
+**Respuesta:
+Porque desacopla el resultado real de la operación del código de estado HTTP: obliga a todo cliente a parsear el cuerpo para saber si
+la operación tuvo éxito, y rompe el comportamiento de intermediarios (proxies, cachés, herramientas de monitoreo) que interpretan
+`200` como éxito por convención y podrían cachear o dar por buena una respuesta que en realidad fue un fallo.
+
+Esto incumple la restricción de Interfaz uniforme, específicamente el principio de mensajes autodescriptivos: el metadato
+debe describir por sí mismo cómo procesar el mensaje y su resultado, sin que un componente intermedio
+tenga que inspeccionar el cuerpo para entender el resultado real de la operación.
+
+**
 
 
 
@@ -163,6 +214,6 @@ Para cada escenario indique el código HTTP correcto y explique en una línea po
 
 Marque con una `x` y complete:
 
-- [ ] Declaro que estas respuestas son de mi autoría, redactadas durante la sesión de examen, sin asistencia de inteligencia artificial ni comunicación con terceros.
+- [x] Declaro que estas respuestas son de mi autoría, redactadas durante la sesión de examen, sin asistencia de inteligencia artificial ni comunicación con terceros.
 
-Firma (nombre completo): ______________________________
+Firma (nombre completo): Bryan Javier Figueroa Morales
