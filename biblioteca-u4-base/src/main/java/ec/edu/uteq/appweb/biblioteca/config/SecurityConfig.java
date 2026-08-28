@@ -48,5 +48,7 @@ public class SecurityConfig {
                 .sessionManagement(sesion -> sesion.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(peticiones -> peticiones.anyRequest().permitAll());
         return http.build();
+
+
     }
 }
